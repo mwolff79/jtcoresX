@@ -41,8 +41,7 @@ module jt053260 (
 
     // ROM Address and Data bus
     output       [20:0] rom_addr,
-    output       [ 7:0] rom_dout,
-    input        [ 7:0] rom_din,
+    input        [ 7:0] rom_data,
 
     // YM2151
     input        [ 7:0] db_din,
@@ -67,12 +66,49 @@ module jt053260 (
 );
 
 
+reg [7:0] ch_mmr[0:31];
+
+wire      sm_a, sm_b;
+wire      ms_a, ms_b;
+
+wire   [ 7:0] key_on, mode, loop_en;
+wire   [ 7:0] ch_st;
+
 // 4 channels for register of 8 bit
-// reg    [7:0] ch0,
-//        [7:0] ch1,
-//        [7:0] ch2,
-//        [7:0] ch3;
-// reg          acc_adpcm;
+wire   [12:0] ch0_pith   = { ch_mmr[1][3:0], ch_mmr[0] };
+wire   [15:0] ch0_length = { ch_mmr[3], ch_mmr[3] };
+wire   [20:0] ch0_start  = { ch_mmr[6][4:0], ch_mmr[5], ch_mmr[4] };
+wire   [12:0] ch0_volume = { ch_mmr[7][6:0]};
+wire          ch0_run,
+              ch0_act;
+       assign ch0_key = key_on[0];
+
+wire   [12:0] ch1_pith   = { ch_mmr[9][3:0], ch_mmr[8] };
+wire   [15:0] ch1_length = { ch_mmr[11], ch_mmr[10] };
+wire   [20:0] ch1_start  = { ch_mmr[14][4:0], ch_mmr[13], ch_mmr[12] };
+wire   [12:0] ch1_volume = { ch_mmr[15][6:0]};
+wire          ch0_run,
+              ch0_act;
+       assign ch1_key = key_on[1];
+
+wire   [12:0] ch2_pith   = { ch_mmr[17][3:0], ch_mmr[16] };
+wire   [15:0] ch2_length = { ch_mmr[19], ch_mmr[18] };
+wire   [20:0] ch2_start  = { ch_mmr[22][4:0], ch_mmr[21], ch_mmr[20] };
+wire   [12:0] ch2_volume = { ch_mmr[23][6:0]};
+wire          ch2_run,
+              ch2_act;
+       assign ch2_key = key_on[2];
+
+wire   [12:0] ch3_pith   = { ch_mmr[25][3:0], ch_mmr[24] };
+wire   [15:0] ch3_length = { ch_mmr[27], ch_mmr[26] };
+wire   [20:0] ch3_start  = { ch_mmr[30][4:0], ch_mmr[29], ch_mmr[28] };
+wire   [12:0] ch3_volume = { ch_mmr[31][6:0]};
+wire          ch3_run,
+              ch3_act;
+       assign ch3_key = key_on[3];
+
+
+reg    [15:0] adpcm
 
 // Kadpcm_table
 // IN - OUT
@@ -93,54 +129,66 @@ module jt053260 (
 //  E : -2
 //  F : -1
 
-wire    data;
-reg     pan,
-        loop,
-        start,
-        pitch,
-        key_on,
-        length,
-        volume;
+// initial begin
+
+//     adpcm[ 0] =  7'd0;
+//     adpcm[ 1] =  7'd1;
+//     adpcm[ 2] =  7'd2;
+//     adpcm[ 3] =  7'd4;
+//     adpcm[ 4] =  7'd8;
+//     adpcm[ 5] =  7'd16;
+//     adpcm[ 6] =  7'd32;
+//     adpcm[ 7] =  7'd64;
+//     adpcm[ 8] = -7'd128;
+//     adpcm[ 9] = -7'd64;
+//     adpcm[10] = -7'd32;
+//     adpcm[11] = -7'd16;
+//     adpcm[12] = -7'd8;
+//     adpcm[13] = -7'd4;
+//     adpcm[14] = -7'd2;
+//     adpcm[15] = -7'd1;
+
+// end
+
+
 
 always @(posedge clk, posedge rst) begin
-    if(rst) begin
-        pan    <= 0;
-        loop   <= 0;
-        start  <= 0;
-        pitch  <= 0;
-        length <= 0;
-        volume <= 0;
+    if( rst ) begin
+        ch_mmr[0] <= 0; ch_mmr[ 8] <= 0; ch_mmr[16] <= 0; ch_mmr[24] <= 0;
+        ch_mmr[1] <= 0; ch_mmr[ 9] <= 0; ch_mmr[17] <= 0; ch_mmr[25] <= 0;
+        ch_mmr[2] <= 0; ch_mmr[10] <= 0; ch_mmr[18] <= 0; ch_mmr[26] <= 0;
+        ch_mmr[3] <= 0; ch_mmr[11] <= 0; ch_mmr[19] <= 0; ch_mmr[27] <= 0;
+        ch_mmr[4] <= 0; ch_mmr[12] <= 0; ch_mmr[20] <= 0; ch_mmr[28] <= 0;
+        ch_mmr[5] <= 0; ch_mmr[13] <= 0; ch_mmr[21] <= 0; ch_mmr[29] <= 0;
+        ch_mmr[6] <= 0; ch_mmr[14] <= 0; ch_mmr[22] <= 0; ch_mmr[30] <= 0;
+        ch_mmr[7] <= 0; ch_mmr[15] <= 0; ch_mmr[23] <= 0; ch_mmr[31] <= 0;
+        ch0_run <= 0;
+        ch1_run <= 0;
+        ch2_run <= 0;
+        ch3_run <= 0;
     end else begin
+
+
 
     end
 end
 
-always @* begin
-    case (offset)
-        2'd0: pitch <= {pitch[], data[]};
-        2'd1: pitch <= {data[], pitch[]};
-        2'd2: length <= {length[], data[]};
-        2'd3: length <= {data[], length[]};
-        2'd4: start <= {start[], data[]};
-        2'd5: start <= {start[], data[], start[]};
-        2'd6: start <= {data[], start[]};
-        2'd7: volume <= data[];
-        default:;
-    endcase
-
-
-    case (offset)
-        2'h28: key_on[3:0] <= data;
-        2'h29: ;
-        2'h2A: loop[3:0] <= data;
-        2'h2B: ;
-        2'h2C: ;
-        2'h2D: ;
-        2'h2E: ;
-        2'h2F: ;
-        default:;
-    endcase
-
+always @(posedge clk, posedge rst) begin
+    if( rst ) begin
+        rom_addr <= 0;
+        ch0_start <= 0;
+        ch1_start <= 0;
+        ch2_start <= 0;
+        ch3_start <= 0;
+    end else begin
+        if( ch0_start ) begin
+            rom_addr[ ]<= ch0_start + cnt;
+        end else begin
+            rom_addr[ ] <= ch1_start + 1'd1;
+            rom_addr[ ] <= ch2_start + 1'd1;
+            rom_addr[ ] <= ch3_start + 1'd1;
+        end
+    end
 end
 
 
