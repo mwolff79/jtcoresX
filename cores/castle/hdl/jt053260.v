@@ -36,16 +36,16 @@ module jt053260 (
     input               aux1,
 
     // Main CPU data bus
-    input        [ 7:0] mdb_din,
-    output       [ 7:0] mdb_dout,
+    input        [ 7:0] mdb_in,
+    output       [ 7:0] mdb_out,
 
     // ROM Address and Data bus
     output       [20:0] rom_addr,
     input        [ 7:0] rom_data,
 
     // YM2151
-    input        [ 7:0] db_din,
-    output       [ 7:0] db_dout,
+    input        [ 7:0] db_in,
+    output       [ 7:0] db_out,
 
     // output bus YM-3012
     output              so,
@@ -72,43 +72,51 @@ wire      sm_a, sm_b;
 wire      ms_a, ms_b;
 
 wire   [ 7:0] key_on, mode, loop_en;
-wire   [ 7:0] ch_st;
+wire   [ 3:0] ch_st;
 
 // 4 channels for register of 8 bit
 wire   [12:0] ch0_pith   = { ch_mmr[1][3:0], ch_mmr[0] };
-wire   [15:0] ch0_length = { ch_mmr[3], ch_mmr[3] };
+wire   [15:0] ch0_length = { ch_mmr[3], ch_mmr[2] };
 wire   [20:0] ch0_start  = { ch_mmr[6][4:0], ch_mmr[5], ch_mmr[4] };
-wire   [12:0] ch0_volume = { ch_mmr[7][6:0]};
+wire   [ 6:0] ch0_volume = { ch_mmr[7][6:0] };
 wire          ch0_run,
               ch0_act;
-       assign ch0_key = key_on[0];
+       assign ch0_key  = key_on[0];
+       assign ch0_loop = loop_en[0];
 
 wire   [12:0] ch1_pith   = { ch_mmr[9][3:0], ch_mmr[8] };
 wire   [15:0] ch1_length = { ch_mmr[11], ch_mmr[10] };
 wire   [20:0] ch1_start  = { ch_mmr[14][4:0], ch_mmr[13], ch_mmr[12] };
-wire   [12:0] ch1_volume = { ch_mmr[15][6:0]};
+wire   [ 6:0] ch1_volume = { ch_mmr[15][6:0] };
 wire          ch0_run,
               ch0_act;
-       assign ch1_key = key_on[1];
+       assign ch1_key  = key_on[1];
+       assign ch1_loop = loop_en[1];
 
 wire   [12:0] ch2_pith   = { ch_mmr[17][3:0], ch_mmr[16] };
 wire   [15:0] ch2_length = { ch_mmr[19], ch_mmr[18] };
 wire   [20:0] ch2_start  = { ch_mmr[22][4:0], ch_mmr[21], ch_mmr[20] };
-wire   [12:0] ch2_volume = { ch_mmr[23][6:0]};
+wire   [ 6:0] ch2_volume = { ch_mmr[23][6:0] };
 wire          ch2_run,
               ch2_act;
-       assign ch2_key = key_on[2];
+       assign ch2_key  = key_on[2];
+       assign ch2_loop = loop_en[2];
 
 wire   [12:0] ch3_pith   = { ch_mmr[25][3:0], ch_mmr[24] };
 wire   [15:0] ch3_length = { ch_mmr[27], ch_mmr[26] };
 wire   [20:0] ch3_start  = { ch_mmr[30][4:0], ch_mmr[29], ch_mmr[28] };
-wire   [12:0] ch3_volume = { ch_mmr[31][6:0]};
+wire   [ 6:0] ch3_volume = { ch_mmr[31][6:0] };
 wire          ch3_run,
               ch3_act;
-       assign ch3_key = key_on[3];
+       assign ch3_key  = key_on[3];
+       assign ch3_loop = loop_en[3];
 
 
 reg    [15:0] adpcm
+
+wire cnt, inc
+assign inc = key_on ? cnt : 0;
+
 
 // Kadpcm_table
 // IN - OUT
@@ -168,28 +176,77 @@ always @(posedge clk, posedge rst) begin
         ch3_run <= 0;
     end else begin
 
+        if ( rw ) begin
+            ch_mmr[ addr ] <= db_din;
 
+        end
+
+        case ( reg2f )
+            1'd0 : rom_read  <= 1;
+            1'd1 : sound_out <= 1;
+            1'd2 : aux1      <= 1;
+            1'd3 : aux2      <= 1;
+            // 1'd4 : ;
+            default : /* default */;
+        endcase
 
     end
 end
+
+
+jt053260_channel u_ch0(
+    .rst     ( rst ),
+    .clk     ( clk ),
+    .cen     ( cen ),
+
+    .run     ( run     ),
+    .key_on  ( key_on  ),
+    .loop_en ( loop_en ),
+    .start   ( start   ),
+    .stop    ( stop    ),
+    .length  ( length  ),
+
+);
+
+endmodule
+
+
+module jt053260_channel(
+
+    input               rst,
+    input               clk,
+    input               cen,
+    input        [ 5:0] addr,
+
+    input      [20:0] start,
+    input      [15:0] length,
+    input      [12:0] pitch,
+    input      [ 6:0] volume,
+    input      [ 7:0] key_on,
+    input      [ 7:0] loop_en,
+    input      [ 3:0] run,
+    input             stop,
+    output reg [16:0] rom_addr
+
+
+);
 
 always @(posedge clk, posedge rst) begin
     if( rst ) begin
         rom_addr <= 0;
-        ch0_start <= 0;
-        ch1_start <= 0;
-        ch2_start <= 0;
-        ch3_start <= 0;
+        start    <= 0;
+        key_on   <= 0;
+        loop_en  <= 0;
     end else begin
-        if( ch0_start ) begin
-            rom_addr[ ]<= ch0_start + cnt;
-        end else begin
-            rom_addr[ ] <= ch1_start + 1'd1;
-            rom_addr[ ] <= ch2_start + 1'd1;
-            rom_addr[ ] <= ch3_start + 1'd1;
+        key_on <= db_din;
+        start  <= db_din;
+        if ( key_on ) begin
+            loop_en[3:0] <= key_on[3:0];
+            loop_en[7:4] <= db_in[7:4];
         end
+        if ( run )
+            rom_addr <= start + length;
     end
 end
-
 
 endmodule
