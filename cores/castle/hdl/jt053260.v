@@ -40,8 +40,8 @@ module jt053260 (
     output       [ 7:0] mdb_out,
 
     // ROM Address and Data bus
-    output       [20:0] rom_addr,
-    input        [ 7:0] rom_data,
+    output       [20:0] r_addr,
+    input        [ 7:0] r_data,
 
     // YM2151
     input        [ 7:0] db_in,
@@ -52,7 +52,6 @@ module jt053260 (
     output              sy,
     output              sh1,
     output              sh2
-
 
     // slots disconnected
     // input               st1,
@@ -68,28 +67,29 @@ module jt053260 (
 
 reg [7:0] ch_mmr[0:31];
 
-wire      sm_a, sm_b;
-wire      ms_a, ms_b;
+wire          sm_a, sm_b;
+wire          ms_a, ms_b;
 
-wire   [ 7:0] key_on, mode, loop_en;
-wire   [ 3:0] ch_st;
+wire   [ 7:0] key_on, mode,
+wire   [ 3:0] ch_st; adpcm, loop_en;
+wire
 
 // 4 channels for register of 8 bit
-wire   [12:0] ch0_pith   = { ch_mmr[1][3:0], ch_mmr[0] };
+wire   [12:0] ch0_pitch  = { ch_mmr[1][3:0], ch_mmr[0] };
 wire   [15:0] ch0_length = { ch_mmr[3], ch_mmr[2] };
 wire   [20:0] ch0_start  = { ch_mmr[6][4:0], ch_mmr[5], ch_mmr[4] };
 wire   [ 6:0] ch0_volume = { ch_mmr[7][6:0] };
-wire          ch0_run,
-              ch0_act;
-       assign ch0_key  = key_on[0];
-       assign ch0_loop = loop_en[0];
+wire          ch0_pan;
+wire          ch0_run;
+wire          ch0_key  = key_on[0];
+wire          ch0_loop = loop_en[0];
 
 wire   [12:0] ch1_pith   = { ch_mmr[9][3:0], ch_mmr[8] };
 wire   [15:0] ch1_length = { ch_mmr[11], ch_mmr[10] };
 wire   [20:0] ch1_start  = { ch_mmr[14][4:0], ch_mmr[13], ch_mmr[12] };
 wire   [ 6:0] ch1_volume = { ch_mmr[15][6:0] };
-wire          ch0_run,
-              ch0_act;
+wire          ch1_pan;
+wire          ch1_run;
        assign ch1_key  = key_on[1];
        assign ch1_loop = loop_en[1];
 
@@ -97,6 +97,7 @@ wire   [12:0] ch2_pith   = { ch_mmr[17][3:0], ch_mmr[16] };
 wire   [15:0] ch2_length = { ch_mmr[19], ch_mmr[18] };
 wire   [20:0] ch2_start  = { ch_mmr[22][4:0], ch_mmr[21], ch_mmr[20] };
 wire   [ 6:0] ch2_volume = { ch_mmr[23][6:0] };
+wire          ch2_pan,
 wire          ch2_run,
               ch2_act;
        assign ch2_key  = key_on[2];
@@ -106,58 +107,43 @@ wire   [12:0] ch3_pith   = { ch_mmr[25][3:0], ch_mmr[24] };
 wire   [15:0] ch3_length = { ch_mmr[27], ch_mmr[26] };
 wire   [20:0] ch3_start  = { ch_mmr[30][4:0], ch_mmr[29], ch_mmr[28] };
 wire   [ 6:0] ch3_volume = { ch_mmr[31][6:0] };
-wire          ch3_run,
-              ch3_act;
+wire          ch3_pan;
+wire          ch3_run;
        assign ch3_key  = key_on[3];
        assign ch3_loop = loop_en[3];
 
 
-reg    [15:0] adpcm
 
-wire cnt, inc
-assign inc = key_on ? cnt : 0;
+always @* begin
+    case ( regop )
+        8'h00 :
+        8'h01 :
+        8'h02 :
+        8'h03 : portdata [ addr ] = db_in
+        8'h28 : key_on = db_in;
+        //8'h29 :
+        8'h2A : begin
+                    loop  = db_in[3:0];
+                    adpcm = db_in[7:4];
+                end
+        //8'h2B :
+        8'h2C : begin
+                    ch0_pan = db_in[3:0];
+                    ch1_pan = db_in[7:4];
+                end
+        8'h2D : begin
+                    ch2_pan = db_in[3:0];
+                    ch3_pan = db_in[7:4];
+                end
+        8'h2E : begin
+                    if ( mode[0] )
+                        rom_data = r_data;
+                end
+        8'h2F : mode = db_in;
+        default : /* default */;
+    endcase
 
-
-// Kadpcm_table
-// IN - OUT
-//  0 :  0
-//  1 :  1
-//  2 :  2
-//  3 :  4
-//  4 :  8
-//  5 :  16
-//  6 :  32
-//  7 :  64
-//  8 : -128
-//  9 : -64
-//  A : -32
-//  B : -16
-//  C : -8
-//  D : -4
-//  E : -2
-//  F : -1
-
-// initial begin
-
-//     adpcm[ 0] =  7'd0;
-//     adpcm[ 1] =  7'd1;
-//     adpcm[ 2] =  7'd2;
-//     adpcm[ 3] =  7'd4;
-//     adpcm[ 4] =  7'd8;
-//     adpcm[ 5] =  7'd16;
-//     adpcm[ 6] =  7'd32;
-//     adpcm[ 7] =  7'd64;
-//     adpcm[ 8] = -7'd128;
-//     adpcm[ 9] = -7'd64;
-//     adpcm[10] = -7'd32;
-//     adpcm[11] = -7'd16;
-//     adpcm[12] = -7'd8;
-//     adpcm[13] = -7'd4;
-//     adpcm[14] = -7'd2;
-//     adpcm[15] = -7'd1;
-
-// end
-
+end
 
 
 always @(posedge clk, posedge rst) begin
@@ -178,34 +164,100 @@ always @(posedge clk, posedge rst) begin
 
         if ( rw ) begin
             ch_mmr[ addr ] <= db_din;
-
         end
-
-        case ( reg2f )
-            1'd0 : rom_read  <= 1;
-            1'd1 : sound_out <= 1;
-            1'd2 : aux1      <= 1;
-            1'd3 : aux2      <= 1;
-            // 1'd4 : ;
-            default : /* default */;
-        endcase
+        ch0_run <= addr ==  4;
+        ch1_run <= addr == 12;
+        ch2_run <= addr == 20;
+        ch3_run <= addr == 28;
 
     end
 end
 
+// Kadpcm_table
+// IN - OUT
+//  0 :  0
+//  1 :  1
+//  2 :  2
+//  3 :  4
+//  4 :  8
+//  5 :  16
+//  6 :  32
+//  7 :  64
+//  8 : -128
+//  9 : -64
+//  A : -32
+//  B : -16
+//  C : -8
+//  D : -4
+//  E : -2
+//  F : -1
 
 jt053260_channel u_ch0(
-    .rst     ( rst ),
-    .clk     ( clk ),
-    .cen     ( cen ),
+    .rst      ( rst ),
+    .clk      ( clk ),
+    .cen      ( cen ),
 
-    .run     ( run     ),
-    .key_on  ( key_on  ),
-    .loop_en ( loop_en ),
-    .start   ( start   ),
-    .stop    ( stop    ),
-    .length  ( length  ),
+    .pitch    ( ch0_pitch   ),
+    .length   ( ch0_length  ),
+    .start    ( ch0_start   ),
+    .volume   ( ch0_volumen ),
+    .run      ( ch0_run     ),
+    .key_on   ( ch0_key     ),
+    .loop_en  ( ch0_loop    ),
 
+    .rom_addr ( rom_addr    ),
+    .rom_data ( rom_data    )
+);
+
+jt053260_channel u_ch1(
+    .rst      ( rst ),
+    .clk      ( clk ),
+    .cen      ( cen ),
+
+    .pitch    ( ch1_pitch   ),
+    .length   ( ch1_length  ),
+    .start    ( ch1_start   ),
+    .volume   ( ch1_volumen ),
+    .run      ( ch1_run     ),
+    .key_on   ( ch1_key     ),
+    .loop_en  ( ch1_loop    ),
+
+    .rom_addr ( rom_addr    ),
+    .rom_data ( rom_data    )
+);
+
+jt053260_channel u_ch2(
+    .rst      ( rst ),
+    .clk      ( clk ),
+    .cen      ( cen ),
+
+    .pitch    ( ch2_pitch   ),
+    .length   ( ch2_length  ),
+    .start    ( ch2_start   ),
+    .volume   ( ch2_volumen ),
+    .run      ( ch2_run     ),
+    .key_on   ( ch2_key     ),
+    .loop_en  ( ch2_loop    ),
+
+    .rom_addr ( rom_addr    ),
+    .rom_data ( rom_data    )
+);
+
+jt053260_channel u_ch3(
+    .rst      ( rst ),
+    .clk      ( clk ),
+    .cen      ( cen ),
+
+    .pitch    ( ch3_pitch   ),
+    .length   ( ch3_length  ),
+    .start    ( ch3_start   ),
+    .volume   ( ch3_volumen ),
+    .run      ( ch3_run     ),
+    .key_on   ( ch3_key     ),
+    .loop_en  ( ch3_loop    ),
+
+    .rom_addr ( rom_addr    ),
+    .rom_data ( rom_data    )
 );
 
 endmodule
@@ -216,36 +268,103 @@ module jt053260_channel(
     input               rst,
     input               clk,
     input               cen,
-    input        [ 5:0] addr,
 
-    input      [20:0] start,
-    input      [15:0] length,
-    input      [12:0] pitch,
-    input      [ 6:0] volume,
-    input      [ 7:0] key_on,
-    input      [ 7:0] loop_en,
-    input      [ 3:0] run,
-    input             stop,
-    output reg [16:0] rom_addr
+    input        [20:0] start,
+    input        [15:0] length,
+    input        [12:0] pitch,
+    input        [ 6:0] volume,
+    input        [ 7:0] key_on,
+    input        [ 7:0] loop_en,
+    input               run,
+    input               pan,
 
+    input        [ 7:0] rom_data
+    output       [ 7:0] db_out,
+    output  reg  [20:0] rom_addr
 
 );
+
+wire   [15:0] cnt;
+wire   [15:0] inc;
+
+reg assign [6:0] kadpcm[0:15];
+reg assign [3:0] pan_vol[0:7];
+
+initial begin
+    kadpcm[ 0] =  7'd0;
+    kadpcm[ 1] =  7'd1;
+    kadpcm[ 2] =  7'd2;
+    kadpcm[ 3] =  7'd4;
+    kadpcm[ 4] =  7'd8;
+    kadpcm[ 5] =  7'd16;
+    kadpcm[ 6] =  7'd32;
+    kadpcm[ 4] =  7'd64;
+    kadpcm[ 8] = -7'd128;
+    kadpcm[ 9] = -7'd64;
+    kadpcm[10] = -7'd32;
+    kadpcm[11] = -7'd16;
+    kadpcm[12] = -7'd8;
+    kadpcm[13] = -7'd4;
+    kadpcm[14] = -7'd2;
+    kadpcm[15] = -7'd1;
+end
+
+initial begin
+    pan_vol[0] = 0;
+    pan_vol[1] = 15;
+    pan_vol[2] = ;
+    pan_vol[3] = ;
+    pan_vol[4] = ;
+    pan_vol[5] = ;
+    pan_vol[6] = ;
+    pan_vol[7] = ;
+end
 
 always @(posedge clk, posedge rst) begin
     if( rst ) begin
         rom_addr <= 0;
-        start    <= 0;
-        key_on   <= 0;
-        loop_en  <= 0;
+        inc      <= 0;
+        adpcm    <= 0;
+        run      <= 0;
+        pan_vol  <= 0;
     end else begin
-        key_on <= db_din;
-        start  <= db_din;
-        if ( key_on ) begin
-            loop_en[3:0] <= key_on[3:0];
-            loop_en[7:4] <= db_in[7:4];
+        if( key_on[0] ) begin
+            rom_addr <= start;
+            pan_vol  <= db_in;
+            cnt    <= length;
+            db_out <= 0;
+            run    <= 1;
+        end else begin
+            // addr start incrementa y cnt decrementa
+            rom_addr[15: 0] <= start[15: 0] + cnt[15:0];
+            rom_addr[20:16] <= start[20:16];
         end
-        if ( run )
-            rom_addr <= start + length;
+
+        // match_n <= ~&(db_in ^~ length[7:0]) | ~&(db_in ^~ length[15:8]);
+        inc <= m_kadpcm ? (cnt + 1'd1) >> 1 : cnt + 1'd1 >> 0;
+        if ( inc > length ) begin
+            if( loop_en ) begin
+                cnt    <= 0;
+                db_out <= 0;
+                inc    <= 0;
+            end else begin
+                run <= 0;
+            end
+        end
+
+        if ( adpcm ) begin
+            if ( cnt )begin
+                rom_data <= 4;
+            end
+            db_out <= kadpcm[rom_data] + 1'd1;
+
+        end else begin
+            db_out <= rom_data;
+        end
+        if ( run ) begin
+
+        end
+
     end
 end
 
