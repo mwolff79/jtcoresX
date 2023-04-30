@@ -377,7 +377,7 @@ jtdd_video u_video(
     .gfx_en       (  gfx_en          )
 );
 
-// Same as locations inside JTCORES.rom file
+// Same as locations inside JTDD.rom file
 localparam BANK_ADDR   = 22'h0_0000;
 localparam MAIN_ADDR   = 22'h2_0000;
 localparam SND_ADDR    = 22'h2_8000;
